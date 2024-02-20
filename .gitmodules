@@ -1,0 +1,6 @@
+[submodule "external/eigenda"]
+	path = external/eigenda
+	url = git@github.com:Layr-Labs/eigenda.git
+[submodule "rust_example/external/eigenda"]
+	path = rust_example/external/eigenda
+	url = git@github.com:Layr-Labs/eigenda.git
