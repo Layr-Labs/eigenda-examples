@@ -6,8 +6,9 @@ mod common {
     tonic::include_proto!("common");
 }
 
+use std::path::Path;
 use std::time::Duration;
-
+use tokio::process::Command;
 use disperser::disperser_client::DisperserClient;
 use disperser::{
     BlobStatus, BlobStatusReply, BlobStatusRequest, DisperseBlobRequest, RetrieveBlobRequest,
@@ -16,11 +17,12 @@ use disperser::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let endpoint = "https://disperser-goerli.eigenda.xyz:443";
+    let endpoint = "https://disperser-holesky.eigenda.xyz:443";
     let mut client = DisperserClient::connect(endpoint).await?;
 
     // Example data to disperse
-    let original_data = b"Example data".to_vec();
+    let original_data = "Example data";
+    let original_data = kzgpad(&original_data).await?;
     let request = tonic::Request::new(DisperseBlobRequest {
         data: original_data.clone(),
         security_params: vec![SecurityParams {
@@ -102,4 +104,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+async fn kzgpad(original_data: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let path = Path::new("external/eigenda/tools/kzgpad/bin/kzgpad");
+    if !path.exists() {
+        return Err("kzgpad tool is not built, go to external/eigenda and follow https://docs.eigenda.xyz/quick-start".into())
+    }
+    let mut command = Command::new(path);
+    command.arg("-e");
+    command.arg(original_data);
+    let output = command.output().await?;
+    let output = String::from_utf8(output.stdout)?;
+    let output = base64::decode(output.trim())?;
+    Ok(output)
 }
