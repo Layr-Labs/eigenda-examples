@@ -11,27 +11,22 @@ use std::time::Duration;
 use disperser::disperser_client::DisperserClient;
 use disperser::{
     BlobStatus, BlobStatusReply, BlobStatusRequest, DisperseBlobRequest, RetrieveBlobRequest,
-    SecurityParams,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let endpoint = "https://disperser-goerli.eigenda.xyz:443";
-    let mut client = DisperserClient::connect(endpoint).await?;
+    let endpoint = "https://disperser-preprod-holesky.eigenda.xyz:443";
+    let mut client = DisperserClient::connect(endpoint).await.unwrap();
 
     // Example data to disperse
-    let original_data = b"Example data".to_vec();
+    let original_data = b"00hello world".to_vec();
     let request = tonic::Request::new(DisperseBlobRequest {
         data: original_data.clone(),
-        security_params: vec![SecurityParams {
-            quorum_id: 0,
-            adversary_threshold: 55,
-            quorum_threshold: 80,
-        }],
+        custom_quorum_numbers: vec![],
         account_id: "".to_string(), // TODO: Fill out
     });
 
-    let response = client.disperse_blob(request).await?;
+    let response = client.disperse_blob(request).await.unwrap();
     let request_id = response.into_inner().request_id;
     println!(
         "Blob dispersion completed, request id '{}'",
@@ -52,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Checking for blob confirmation...");
         let reply = client.get_blob_status(status_request).await?.into_inner();
         blob_status = reply.status();
-        status_response_option = Some(reply.clone());
+        status_response_option = Some(reply);
 
         match blob_status {
             BlobStatus::Confirmed | BlobStatus::Finalized => {
