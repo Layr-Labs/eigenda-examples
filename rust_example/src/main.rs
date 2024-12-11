@@ -13,20 +13,29 @@ use disperser::{
     BlobStatus, BlobStatusReply, BlobStatusRequest, DisperseBlobRequest, RetrieveBlobRequest,
 };
 
+/// Default value for the EigenDA disperser URL
+/// This is the URL for the preprod EigenDA disperser for the holesky Ethereum testnet
 const DEFAULT_DISPERSER_URL: &str = "https://disperser-preprod-holesky.eigenda.xyz:443";
+
+/// Default message to send in the blob
 const DEFAULT_MESSAGE: &str = "hello world";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args();
     let endpoint = args.nth(1).unwrap_or(DEFAULT_DISPERSER_URL.to_string());
-    let mut client = DisperserClient::connect(endpoint).await.unwrap();
+    let mut client = DisperserClient::connect(endpoint.clone()).await.unwrap();
 
     let message = args.next().unwrap_or(DEFAULT_MESSAGE.to_string());
+    if message.len() > 31 {
+        return Err("Message is too long, must be 31 characters or less.".into());
+    }
 
-    // Example data to disperse
-    let mut original_data = vec![0; message.len() + 2];
-    original_data[2..].copy_from_slice(message.as_bytes());
+    println!("Sending blob containing '{message}' to '{endpoint}'");
+
+    // Left-pad to ensure it's valid
+    let original_data: Vec<u8> = [b"\0".as_slice(), message.as_bytes()].concat();
+
     let request = tonic::Request::new(DisperseBlobRequest {
         data: original_data.clone(),
         custom_quorum_numbers: vec![],
@@ -61,6 +70,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Blob processing completed.");
                 break;
             }
+            BlobStatus::Failed => {
+                return Err("Blob processing failed.".into());
+            }
             _ => {
                 println!("Blob not yet confirmed, sleeping for 5 seconds.");
                 tokio::time::sleep(Duration::from_secs(5)).await
@@ -89,12 +101,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Retrieve the blob after successful dispersal
     let retrieve_request = tonic::Request::new(RetrieveBlobRequest {
         // Populate with appropriate fields
-        batch_header_hash: batch_header_hash,
-        blob_index: blob_index, // Set appropriately based on how blobs are indexed in your system
+        batch_header_hash,
+        blob_index, // Set appropriately based on how blobs are indexed in your system
     });
 
     let retrieve_response = client.retrieve_blob(retrieve_request).await?;
     let retrieved_data = retrieve_response.into_inner().data;
+
+    println!(
+        "Retrieved blob with data '{}'",
+        String::from_utf8(retrieved_data[1..].to_vec()).unwrap()
+    );
 
     // Check if the original data matches the retrieved data
     if original_data == retrieved_data {
