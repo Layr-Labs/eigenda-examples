@@ -13,13 +13,20 @@ use disperser::{
     BlobStatus, BlobStatusReply, BlobStatusRequest, DisperseBlobRequest, RetrieveBlobRequest,
 };
 
+const DEFAULT_DISPERSER_URL: &str = "https://disperser-preprod-holesky.eigenda.xyz:443";
+const DEFAULT_MESSAGE: &str = "hello world";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let endpoint = "https://disperser-preprod-holesky.eigenda.xyz:443";
+    let mut args = std::env::args();
+    let endpoint = args.nth(1).unwrap_or(DEFAULT_DISPERSER_URL.to_string());
     let mut client = DisperserClient::connect(endpoint).await.unwrap();
 
+    let message = args.next().unwrap_or(DEFAULT_MESSAGE.to_string());
+
     // Example data to disperse
-    let original_data = b"00hello world".to_vec();
+    let mut original_data = vec![0; message.len() + 2];
+    original_data[2..].copy_from_slice(message.as_bytes());
     let request = tonic::Request::new(DisperseBlobRequest {
         data: original_data.clone(),
         custom_quorum_numbers: vec![],
